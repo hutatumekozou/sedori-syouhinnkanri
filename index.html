@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>再出品管理</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <h1>再出品管理</h1>
+          <p id="summaryText">登録商品 0件</p>
+        </div>
+        <div class="topbar-actions">
+          <button class="secondary" id="exportButton" type="button">CSV出力</button>
+          <button class="secondary" id="clearButton" type="button">全削除</button>
+        </div>
+      </header>
+
+      <nav class="page-tabs" aria-label="ページ切り替え">
+        <button class="tab-button active" id="registerTab" type="button" data-page="register">商品登録</button>
+        <button class="tab-button" id="storageTab" type="button" data-page="storage">登録情報</button>
+      </nav>
+
+      <section id="registerPage" class="page-panel active" aria-label="商品登録ページ">
+        <form id="itemForm" class="editor">
+          <input type="hidden" id="editingId">
+
+          <div class="form-header">
+            <h2 id="formTitle">商品を登録</h2>
+            <button class="secondary compact" id="resetButton" type="button">新規入力</button>
+          </div>
+
+          <label>
+            <span>品番</span>
+            <input id="productCodeInput" name="productCode" type="text" placeholder="例: A-001">
+          </label>
+
+          <label>
+            <span>タイトル</span>
+            <input id="titleInput" name="title" type="text" placeholder="例: Nintendo Switch 本体 グレー" required>
+          </label>
+
+          <label>
+            <span>説明文</span>
+            <textarea id="descriptionInput" name="description" rows="7" placeholder="商品の状態、付属品、注意点など"></textarea>
+          </label>
+
+          <div class="field-grid">
+            <label>
+              <span>出品価格</span>
+              <input id="priceInput" name="price" type="number" min="0" step="1" placeholder="15000">
+            </label>
+
+            <label>
+              <span>相場予定</span>
+              <input id="marketInput" name="market" type="number" min="0" step="1" placeholder="18000">
+            </label>
+          </div>
+
+          <div class="field-grid">
+            <label>
+              <span>再出品予定日</span>
+              <input id="relistDateInput" name="relistDate" type="date" required>
+            </label>
+
+            <fieldset class="site-options">
+              <span>出品するサイト</span>
+              <label><input class="site-input" name="site" type="checkbox" value="メルカリ" checked> メルカリ</label>
+              <label><input class="site-input" name="site" type="checkbox" value="Yahooフリマ"> Yahooフリマ</label>
+              <label><input class="site-input" name="site" type="checkbox" value="ヤフオク"> ヤフオク</label>
+              <label><input class="site-input" name="site" type="checkbox" value="その他"> その他</label>
+            </fieldset>
+          </div>
+
+          <label id="otherSiteLabel" class="hidden">
+            <span>その他の出品サイト</span>
+            <input id="otherSiteInput" name="otherSite" type="text" placeholder="例: ラクマ、BASEなど">
+          </label>
+
+          <label class="folder-drop">
+            <span>画像フォルダ</span>
+            <input id="folderInput" name="folder" type="file" webkitdirectory directory multiple accept="image/*">
+            <strong id="folderStatus">フォルダを選択</strong>
+            <small>画像ファイル名と枚数を登録します</small>
+          </label>
+
+          <div class="form-actions">
+            <button id="saveButton" type="submit">登録する</button>
+          </div>
+        </form>
+      </section>
+
+      <section id="storagePage" class="page-panel" aria-label="登録情報保管ページ">
+        <section class="list-panel" aria-label="登録済み商品">
+          <div class="list-tools">
+            <div class="search-wrap">
+              <input id="searchInput" type="search" placeholder="品番・タイトル・説明文・サイトで検索">
+            </div>
+            <select id="statusFilter" aria-label="予定日フィルター">
+              <option value="all">すべて</option>
+              <option value="due">予定日到来</option>
+              <option value="upcoming">今後の予定</option>
+            </select>
+            <select id="sortSelect" aria-label="並び替え">
+              <option value="dateAsc">予定日が近い順</option>
+              <option value="dateDesc">予定日が遠い順</option>
+              <option value="updatedDesc">更新が新しい順</option>
+            </select>
+          </div>
+
+          <div id="itemList" class="item-list"></div>
+          <p id="emptyState" class="empty-state">まだ商品が登録されていません。</p>
+        </section>
+      </section>
+    </main>
+
+    <template id="itemTemplate">
+      <article class="item-card">
+        <div class="item-main">
+          <div class="item-title-row">
+            <div>
+              <p class="product-code"></p>
+              <h3></h3>
+            </div>
+            <span class="site-badge"></span>
+          </div>
+          <p class="description"></p>
+          <div class="meta-grid">
+            <span class="price"></span>
+            <span class="market"></span>
+            <span class="date"></span>
+            <span class="folder"></span>
+          </div>
+        </div>
+        <div class="item-actions">
+          <button class="secondary download-button" type="button">画像DL</button>
+          <button class="secondary edit-button" type="button">編集</button>
+          <button class="secondary duplicate-button" type="button">複製</button>
+          <button class="danger delete-button" type="button">削除</button>
+        </div>
+      </article>
+    </template>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
