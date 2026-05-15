@@ -22,6 +22,7 @@
       <nav class="page-tabs" aria-label="ページ切り替え">
         <button class="tab-button active" id="registerTab" type="button" data-page="register">商品登録</button>
         <button class="tab-button" id="storageTab" type="button" data-page="storage">登録情報</button>
+        <button class="tab-button" id="archiveTab" type="button" data-page="archive">アーカイブ</button>
       </nav>
 
       <section id="registerPage" class="page-panel active" aria-label="商品登録ページ">
@@ -115,6 +116,19 @@
           <p id="emptyState" class="empty-state">まだ商品が登録されていません。</p>
         </section>
       </section>
+
+      <section id="archivePage" class="page-panel" aria-label="アーカイブページ">
+        <section class="list-panel" aria-label="出品完了履歴">
+          <div class="archive-header">
+            <div>
+              <h2>出品完了履歴</h2>
+              <p>「出品完了のため削除」を押した商品の品番を残します。</p>
+            </div>
+          </div>
+          <div id="archiveList" class="archive-list"></div>
+          <p id="archiveEmptyState" class="empty-state">まだ出品完了履歴はありません。</p>
+        </section>
+      </section>
     </main>
 
     <template id="itemTemplate">
@@ -139,7 +153,19 @@
           <button class="secondary download-button" type="button">画像DL</button>
           <button class="secondary edit-button" type="button">編集</button>
           <button class="secondary duplicate-button" type="button">複製</button>
+          <button class="complete-delete-button" type="button">出品完了のため削除</button>
           <button class="danger delete-button" type="button">削除</button>
+        </div>
+      </article>
+    </template>
+
+    <template id="archiveTemplate">
+      <article class="archive-card">
+        <p class="archived-code"></p>
+        <h3></h3>
+        <div class="archive-meta">
+          <span class="archived-at"></span>
+          <span class="archived-site"></span>
         </div>
       </article>
     </template>

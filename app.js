@@ -1,4 +1,5 @@
 const STORAGE_KEY = "relist-manager-items-v1";
+const ARCHIVE_STORAGE_KEY = "relist-manager-archive-v1";
 
 const form = document.querySelector("#itemForm");
 const editingIdInput = document.querySelector("#editingId");
@@ -16,6 +17,9 @@ const folderStatus = document.querySelector("#folderStatus");
 const itemList = document.querySelector("#itemList");
 const emptyState = document.querySelector("#emptyState");
 const itemTemplate = document.querySelector("#itemTemplate");
+const archiveList = document.querySelector("#archiveList");
+const archiveEmptyState = document.querySelector("#archiveEmptyState");
+const archiveTemplate = document.querySelector("#archiveTemplate");
 const summaryText = document.querySelector("#summaryText");
 const searchInput = document.querySelector("#searchInput");
 const statusFilter = document.querySelector("#statusFilter");
@@ -28,8 +32,10 @@ const saveButton = document.querySelector("#saveButton");
 const pageTabs = document.querySelectorAll(".tab-button");
 const registerPage = document.querySelector("#registerPage");
 const storagePage = document.querySelector("#storagePage");
+const archivePage = document.querySelector("#archivePage");
 
 let items = loadItems();
+let archivedItems = loadArchivedItems();
 let selectedFolder = null;
 
 function loadItems() {
@@ -50,6 +56,18 @@ function saveItems() {
   }
 }
 
+function loadArchivedItems() {
+  try {
+    return JSON.parse(localStorage.getItem(ARCHIVE_STORAGE_KEY)) || [];
+  } catch {
+    return [];
+  }
+}
+
+function saveArchivedItems() {
+  localStorage.setItem(ARCHIVE_STORAGE_KEY, JSON.stringify(archivedItems));
+}
+
 function formatYen(value) {
   if (!value && value !== 0) return "未入力";
   return Number(value).toLocaleString("ja-JP", {
@@ -61,6 +79,14 @@ function formatYen(value) {
 
 function todayString() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function formatDateTime(value) {
+  if (!value) return "日時不明";
+  return new Intl.DateTimeFormat("ja-JP", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
 }
 
 function isDue(dateValue) {
@@ -78,8 +104,11 @@ function escapeCsv(value) {
 
 function switchPage(pageName) {
   const isRegister = pageName === "register";
+  const isStorage = pageName === "storage";
+  const isArchive = pageName === "archive";
   registerPage.classList.toggle("active", isRegister);
-  storagePage.classList.toggle("active", !isRegister);
+  storagePage.classList.toggle("active", isStorage);
+  archivePage.classList.toggle("active", isArchive);
 
   pageTabs.forEach((tab) => {
     tab.classList.toggle("active", tab.dataset.page === pageName);
@@ -161,12 +190,30 @@ function render() {
     downloadButton.addEventListener("click", () => downloadImages(item.id));
     node.querySelector(".edit-button").addEventListener("click", () => editItem(item.id));
     node.querySelector(".duplicate-button").addEventListener("click", () => duplicateItem(item.id));
+    node.querySelector(".complete-delete-button").addEventListener("click", () => archiveCompletedItem(item.id));
     node.querySelector(".delete-button").addEventListener("click", () => deleteItem(item.id));
     itemList.append(node);
   });
 
   const dueCount = items.filter((item) => isDue(item.relistDate)).length;
-  summaryText.textContent = `登録商品 ${items.length}件 / 予定日到来 ${dueCount}件`;
+  summaryText.textContent = `登録商品 ${items.length}件 / 予定日到来 ${dueCount}件 / 完了履歴 ${archivedItems.length}件`;
+  renderArchive();
+}
+
+function renderArchive() {
+  const sortedArchivedItems = [...archivedItems].sort((a, b) => (b.archivedAt || "").localeCompare(a.archivedAt || ""));
+
+  archiveList.innerHTML = "";
+  archiveEmptyState.hidden = sortedArchivedItems.length > 0;
+
+  sortedArchivedItems.forEach((item) => {
+    const node = archiveTemplate.content.firstElementChild.cloneNode(true);
+    node.querySelector(".archived-code").textContent = item.productCode ? `品番: ${item.productCode}` : "品番: 未入力";
+    node.querySelector("h3").textContent = item.title || "タイトルなし";
+    node.querySelector(".archived-at").textContent = `完了削除日: ${formatDateTime(item.archivedAt)}`;
+    node.querySelector(".archived-site").textContent = `出品サイト: ${item.siteName || "未選択"}`;
+    archiveList.append(node);
+  });
 }
 
 function resetForm() {
@@ -279,6 +326,29 @@ function deleteItem(id) {
   items = items.filter((entry) => entry.id !== id);
   if (!saveItems()) return;
   render();
+}
+
+function archiveCompletedItem(id) {
+  const item = items.find((entry) => entry.id === id);
+  if (!item) return;
+  if (!confirm(`「${item.title}」を出品完了として削除し、品番をアーカイブに残しますか？`)) return;
+
+  archivedItems = [
+    {
+      id: crypto.randomUUID(),
+      sourceItemId: item.id,
+      productCode: item.productCode || "",
+      title: item.title || "",
+      siteName: getSiteName(item),
+      archivedAt: new Date().toISOString(),
+    },
+    ...archivedItems,
+  ];
+  items = items.filter((entry) => entry.id !== id);
+  saveArchivedItems();
+  if (!saveItems()) return;
+  render();
+  switchPage("archive");
 }
 
 function clearAll() {
