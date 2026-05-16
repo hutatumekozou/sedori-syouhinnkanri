@@ -341,6 +341,14 @@ textarea:focus {
   overflow-wrap: anywhere;
 }
 
+.relist-date {
+  color: var(--warn);
+  font-size: 0.86rem;
+  font-weight: 800;
+  margin: 0 0 8px;
+  overflow-wrap: anywhere;
+}
+
 .site-badge {
   background: #edf7f6;
   border-radius: 999px;

@@ -255,11 +255,11 @@ function render() {
 
     node.querySelector("h3").textContent = item.title;
     node.querySelector(".product-code").textContent = item.productCode ? `品番: ${item.productCode}` : "品番: 未入力";
+    node.querySelector(".relist-date").textContent = `出品予定日: ${item.relistDate || "未設定"}`;
     node.querySelector(".site-badge").textContent = getSiteName(item);
     node.querySelector(".description").textContent = item.description || "説明文なし";
     node.querySelector(".price").textContent = `出品価格: ${formatYen(item.price)}`;
     node.querySelector(".market").textContent = `相場予定: ${formatYen(item.market)}`;
-    node.querySelector(".date").textContent = `再出品予定日: ${item.relistDate || "未設定"}`;
     node.querySelector(".folder").textContent = item.folderName
       ? `画像: ${item.folderName} (${item.imageCount}枚)`
       : "画像: 未選択";
