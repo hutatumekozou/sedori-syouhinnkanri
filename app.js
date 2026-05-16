@@ -15,6 +15,8 @@ const otherSiteInput = document.querySelector("#otherSiteInput");
 const otherSiteLabel = document.querySelector("#otherSiteLabel");
 const folderInput = document.querySelector("#folderInput");
 const folderStatus = document.querySelector("#folderStatus");
+const zipInput = document.querySelector("#zipInput");
+const zipStatus = document.querySelector("#zipStatus");
 const itemList = document.querySelector("#itemList");
 const emptyState = document.querySelector("#emptyState");
 const itemTemplate = document.querySelector("#itemTemplate");
@@ -38,6 +40,7 @@ const archivePage = document.querySelector("#archivePage");
 let items = loadLocalItems();
 let archivedItems = loadLocalArchivedItems();
 let selectedFolder = null;
+let selectedZipFile = null;
 
 function loadLocalItems() {
   try {
@@ -52,7 +55,7 @@ function saveLocalItems() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
     return true;
   } catch {
-    alert("画像データが大きすぎて保存できませんでした。画像枚数を減らすか、画像サイズを小さくしてください。");
+    alert("画像またはZIPデータが大きすぎて保存できませんでした。ファイル数やサイズを減らしてください。");
     return false;
   }
 }
@@ -159,6 +162,12 @@ function formatDateTime(value) {
   }).format(new Date(value));
 }
 
+function formatFileSize(size) {
+  if (!size && size !== 0) return "サイズ不明";
+  if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024)).toLocaleString("ja-JP")} KB`;
+  return `${(size / 1024 / 1024).toLocaleString("ja-JP", { maximumFractionDigits: 1 })} MB`;
+}
+
 function isDue(dateValue) {
   return dateValue && dateValue <= todayString();
 }
@@ -254,10 +263,16 @@ function render() {
     node.querySelector(".folder").textContent = item.folderName
       ? `画像: ${item.folderName} (${item.imageCount}枚)`
       : "画像: 未選択";
+    node.querySelector(".zip-file").textContent = item.zipFileData
+      ? `ZIP: ${item.zipFileName} (${formatFileSize(item.zipFileSize)})`
+      : "ZIP: 未選択";
 
     const downloadButton = node.querySelector(".download-button");
     downloadButton.disabled = !(item.imageData && item.imageData.length);
     downloadButton.addEventListener("click", () => downloadImages(item.id));
+    const zipDownloadButton = node.querySelector(".zip-download-button");
+    zipDownloadButton.disabled = !item.zipFileData;
+    zipDownloadButton.addEventListener("click", () => downloadZipFile(item.id));
     node.querySelector(".edit-button").addEventListener("click", () => editItem(item.id));
     node.querySelector(".duplicate-button").addEventListener("click", () => duplicateItem(item.id));
     node.querySelector(".complete-delete-button").addEventListener("click", () => archiveCompletedItem(item.id));
@@ -290,8 +305,10 @@ function resetForm() {
   form.reset();
   editingIdInput.value = "";
   selectedFolder = null;
+  selectedZipFile = null;
   setSelectedSites(["メルカリ"]);
   folderStatus.textContent = "フォルダを選択";
+  zipStatus.textContent = "ZIPを選択";
   formTitle.textContent = "商品を登録";
   saveButton.textContent = "登録する";
   relistDateInput.value = todayString();
@@ -311,9 +328,24 @@ function getFolderInfo() {
     : { folderName: "", imageCount: 0, imageFiles: [], imageData: [] };
 }
 
+function getZipInfo() {
+  if (selectedZipFile) return selectedZipFile;
+
+  const editingItem = items.find((item) => item.id === editingIdInput.value);
+  return editingItem
+    ? {
+        zipFileName: editingItem.zipFileName || "",
+        zipFileSize: editingItem.zipFileSize || 0,
+        zipFileType: editingItem.zipFileType || "",
+        zipFileData: editingItem.zipFileData || "",
+      }
+    : { zipFileName: "", zipFileSize: 0, zipFileType: "", zipFileData: "" };
+}
+
 async function submitItem(event) {
   event.preventDefault();
   const folderInfo = getFolderInfo();
+  const zipInfo = getZipInfo();
   const id = editingIdInput.value || crypto.randomUUID();
   const previousItems = [...items];
   const previousArchivedItems = [...archivedItems];
@@ -329,6 +361,7 @@ async function submitItem(event) {
     site: getSelectedSites()[0] || "",
     otherSite: otherSiteInput.value.trim(),
     ...folderInfo,
+    ...zipInfo,
     updatedAt: new Date().toISOString(),
   };
 
@@ -365,9 +398,13 @@ function editItem(id) {
   setSelectedSites(getItemSites(item));
   otherSiteInput.value = item.otherSite || "";
   selectedFolder = null;
+  selectedZipFile = null;
   folderStatus.textContent = item.folderName
     ? `${item.folderName} (${item.imageCount}枚)`
     : "フォルダを選択";
+  zipStatus.textContent = item.zipFileData
+    ? `${item.zipFileName} (${formatFileSize(item.zipFileSize)})`
+    : "ZIPを選択";
   formTitle.textContent = "商品を編集";
   saveButton.textContent = "更新する";
   switchPage("register");
@@ -497,8 +534,22 @@ function downloadImages(id) {
   });
 }
 
+function downloadZipFile(id) {
+  const item = items.find((entry) => entry.id === id);
+
+  if (!item?.zipFileData) {
+    alert("この商品にはダウンロードできるZIPファイルがありません。編集からZIPを選び直してください。");
+    return;
+  }
+
+  downloadFile({
+    name: item.zipFileName || "attachment.zip",
+    dataUrl: item.zipFileData,
+  });
+}
+
 function exportCsv() {
-  const header = ["品番", "タイトル", "説明文", "出品価格", "相場予定", "再出品予定日", "出品サイト", "画像フォルダ", "画像枚数"];
+  const header = ["品番", "タイトル", "説明文", "出品価格", "相場予定", "再出品予定日", "出品サイト", "画像フォルダ", "画像枚数", "ZIPファイル"];
   const rows = items.map((item) => [
     item.productCode,
     item.title,
@@ -509,6 +560,7 @@ function exportCsv() {
     getSiteName(item),
     item.folderName,
     item.imageCount,
+    item.zipFileName,
   ]);
   const csv = [header, ...rows].map((row) => row.map(escapeCsv).join(",")).join("\n");
   const blob = new Blob(["\ufeff", csv], { type: "text/csv;charset=utf-8" });
@@ -555,6 +607,33 @@ folderInput.addEventListener("change", async () => {
     imageData,
   };
   folderStatus.textContent = folderName ? `${folderName} (${files.length}枚)` : "フォルダを選択";
+});
+
+zipInput.addEventListener("change", async () => {
+  const file = zipInput.files?.[0];
+
+  if (!file) {
+    selectedZipFile = null;
+    zipStatus.textContent = "ZIPを選択";
+    return;
+  }
+
+  if (!file.name.toLowerCase().endsWith(".zip")) {
+    selectedZipFile = null;
+    zipInput.value = "";
+    zipStatus.textContent = "ZIPを選択";
+    alert("ZIPファイルを選択してください。");
+    return;
+  }
+
+  zipStatus.textContent = "ZIPを読み込み中...";
+  selectedZipFile = {
+    zipFileName: file.name,
+    zipFileSize: file.size,
+    zipFileType: file.type || "application/zip",
+    zipFileData: await readFileAsDataUrl(file),
+  };
+  zipStatus.textContent = `${file.name} (${formatFileSize(file.size)})`;
 });
 
 form.addEventListener("submit", submitItem);

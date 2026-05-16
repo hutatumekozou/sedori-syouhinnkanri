@@ -88,6 +88,13 @@
             <small>画像ファイル名と枚数を登録します</small>
           </label>
 
+          <label class="folder-drop">
+            <span>圧縮ファイル</span>
+            <input id="zipInput" name="zipFile" type="file" accept=".zip,application/zip,application/x-zip-compressed">
+            <strong id="zipStatus">ZIPを選択</strong>
+            <small>画像フォルダと同時にZIPファイルも登録できます</small>
+          </label>
+
           <div class="form-actions">
             <button id="saveButton" type="submit">登録する</button>
           </div>
@@ -147,10 +154,12 @@
             <span class="market"></span>
             <span class="date"></span>
             <span class="folder"></span>
+            <span class="zip-file"></span>
           </div>
         </div>
         <div class="item-actions">
           <button class="secondary download-button" type="button">画像DL</button>
+          <button class="secondary zip-download-button" type="button">ZIP DL</button>
           <button class="secondary edit-button" type="button">編集</button>
           <button class="secondary duplicate-button" type="button">複製</button>
           <button class="complete-delete-button" type="button">出品完了のため削除</button>
