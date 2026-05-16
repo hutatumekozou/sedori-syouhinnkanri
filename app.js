@@ -1,5 +1,6 @@
 const STORAGE_KEY = "relist-manager-items-v1";
 const ARCHIVE_STORAGE_KEY = "relist-manager-archive-v1";
+const API_STATE_URL = "/api/state";
 
 const form = document.querySelector("#itemForm");
 const editingIdInput = document.querySelector("#editingId");
@@ -34,11 +35,11 @@ const registerPage = document.querySelector("#registerPage");
 const storagePage = document.querySelector("#storagePage");
 const archivePage = document.querySelector("#archivePage");
 
-let items = loadItems();
-let archivedItems = loadArchivedItems();
+let items = loadLocalItems();
+let archivedItems = loadLocalArchivedItems();
 let selectedFolder = null;
 
-function loadItems() {
+function loadLocalItems() {
   try {
     return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
   } catch {
@@ -46,7 +47,7 @@ function loadItems() {
   }
 }
 
-function saveItems() {
+function saveLocalItems() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
     return true;
@@ -56,7 +57,7 @@ function saveItems() {
   }
 }
 
-function loadArchivedItems() {
+function loadLocalArchivedItems() {
   try {
     return JSON.parse(localStorage.getItem(ARCHIVE_STORAGE_KEY)) || [];
   } catch {
@@ -64,8 +65,77 @@ function loadArchivedItems() {
   }
 }
 
-function saveArchivedItems() {
-  localStorage.setItem(ARCHIVE_STORAGE_KEY, JSON.stringify(archivedItems));
+function saveLocalArchivedItems() {
+  try {
+    localStorage.setItem(ARCHIVE_STORAGE_KEY, JSON.stringify(archivedItems));
+    return true;
+  } catch {
+    alert("アーカイブ履歴をこの端末に保存できませんでした。");
+    return false;
+  }
+}
+
+function saveLocalState() {
+  return saveLocalItems() && saveLocalArchivedItems();
+}
+
+async function loadCloudState() {
+  const response = await fetch(API_STATE_URL, {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) throw new Error(`Cloud load failed: ${response.status}`);
+  const state = await response.json();
+  return {
+    items: Array.isArray(state.items) ? state.items : [],
+    archivedItems: Array.isArray(state.archivedItems) ? state.archivedItems : [],
+  };
+}
+
+async function saveCloudState() {
+  const response = await fetch(API_STATE_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ items, archivedItems }),
+  });
+  if (!response.ok) throw new Error(`Cloud save failed: ${response.status}`);
+}
+
+async function saveState() {
+  if (!saveLocalState()) return false;
+
+  try {
+    await saveCloudState();
+    return true;
+  } catch (error) {
+    console.error(error);
+    alert("クラウド保存に失敗しました。ネット接続またはVercel Postgres設定を確認してください。");
+    return false;
+  }
+}
+
+async function initializeState() {
+  resetForm();
+  render();
+
+  try {
+    const localItems = loadLocalItems();
+    const localArchivedItems = loadLocalArchivedItems();
+    const cloudState = await loadCloudState();
+    const cloudIsEmpty = cloudState.items.length === 0 && cloudState.archivedItems.length === 0;
+    const localHasData = localItems.length > 0 || localArchivedItems.length > 0;
+
+    items = cloudIsEmpty && localHasData ? localItems : cloudState.items;
+    archivedItems = cloudIsEmpty && localHasData ? localArchivedItems : cloudState.archivedItems;
+    saveLocalState();
+    render();
+
+    if (cloudIsEmpty && localHasData) {
+      await saveState();
+    }
+  } catch (error) {
+    console.error(error);
+    alert("クラウドDBから読み込めませんでした。この端末内の保存データを表示しています。");
+  }
 }
 
 function formatYen(value) {
@@ -246,6 +316,7 @@ async function submitItem(event) {
   const folderInfo = getFolderInfo();
   const id = editingIdInput.value || crypto.randomUUID();
   const previousItems = [...items];
+  const previousArchivedItems = [...archivedItems];
   const nextItem = {
     id,
     productCode: productCodeInput.value.trim(),
@@ -267,9 +338,12 @@ async function submitItem(event) {
     items = [nextItem, ...items];
   }
 
-  const saved = saveItems();
+  const saved = await saveState();
   if (!saved) {
     items = previousItems;
+    archivedItems = previousArchivedItems;
+    saveLocalState();
+    render();
     return;
   }
   resetForm();
@@ -300,9 +374,10 @@ function editItem(id) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function duplicateItem(id) {
+async function duplicateItem(id) {
   const item = items.find((entry) => entry.id === id);
   if (!item) return;
+  const previousItems = [...items];
 
   items = [
     {
@@ -314,24 +389,37 @@ function duplicateItem(id) {
     },
     ...items,
   ];
-  if (!saveItems()) return;
+  if (!(await saveState())) {
+    items = previousItems;
+    saveLocalState();
+    render();
+    return;
+  }
   render();
 }
 
-function deleteItem(id) {
+async function deleteItem(id) {
   const item = items.find((entry) => entry.id === id);
   if (!item) return;
   if (!confirm(`「${item.title}」を削除しますか？`)) return;
+  const previousItems = [...items];
 
   items = items.filter((entry) => entry.id !== id);
-  if (!saveItems()) return;
+  if (!(await saveState())) {
+    items = previousItems;
+    saveLocalState();
+    render();
+    return;
+  }
   render();
 }
 
-function archiveCompletedItem(id) {
+async function archiveCompletedItem(id) {
   const item = items.find((entry) => entry.id === id);
   if (!item) return;
   if (!confirm(`「${item.title}」を出品完了として削除し、品番をアーカイブに残しますか？`)) return;
+  const previousItems = [...items];
+  const previousArchivedItems = [...archivedItems];
 
   archivedItems = [
     {
@@ -345,18 +433,29 @@ function archiveCompletedItem(id) {
     ...archivedItems,
   ];
   items = items.filter((entry) => entry.id !== id);
-  saveArchivedItems();
-  if (!saveItems()) return;
+  if (!(await saveState())) {
+    items = previousItems;
+    archivedItems = previousArchivedItems;
+    saveLocalState();
+    render();
+    return;
+  }
   render();
   switchPage("archive");
 }
 
-function clearAll() {
+async function clearAll() {
   if (!items.length) return;
   if (!confirm("登録済みの商品をすべて削除しますか？")) return;
+  const previousItems = [...items];
 
   items = [];
-  saveItems();
+  if (!(await saveState())) {
+    items = previousItems;
+    saveLocalState();
+    render();
+    return;
+  }
   resetForm();
   render();
 }
@@ -469,5 +568,4 @@ searchInput.addEventListener("input", render);
 statusFilter.addEventListener("change", render);
 sortSelect.addEventListener("change", render);
 
-resetForm();
-render();
+initializeState();
